@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Retirement Planner</title>
+<style>
+  :root {
+    --bg: #0f172a; --card: #1e293b; --border: #334155;
+    --text: #e2e8f0; --muted: #94a3b8; --accent: #38bdf8;
+    --good: #4ade80; --bad: #f87171; --warn: #fbbf24;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); padding: 24px; }
+  h1 { font-size: 1.6rem; margin-bottom: 4px; }
+  .subtitle { color: var(--muted); margin-bottom: 20px; font-size: 0.9rem; }
+  .layout { display: grid; grid-template-columns: 380px 1fr; gap: 20px; align-items: start; max-width: 1300px; margin: 0 auto; }
+  @media (max-width: 900px) { .layout { grid-template-columns: 1fr; } }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 18px; margin-bottom: 16px; }
+  .card h2 { font-size: 1.05rem; margin-bottom: 12px; color: var(--accent); }
+  label { display: block; font-size: 0.82rem; color: var(--muted); margin: 10px 0 4px; }
+  input[type="number"] { width: 100%; padding: 8px 10px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 0.95rem; }
+  input:focus { outline: none; border-color: var(--accent); }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+  th, td { padding: 7px 8px; text-align: left; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 600; font-size: 0.78rem; text-transform: uppercase; }
+  td input { padding: 6px 8px; }
+  .del-btn { background: none; border: 1px solid var(--border); color: var(--bad); border-radius: 6px; padding: 5px 10px; cursor: pointer; }
+  .add-btn { margin-top: 10px; background: none; border: 1px dashed var(--accent); color: var(--accent); border-radius: 8px; padding: 8px 14px; cursor: pointer; width: 100%; }
+  button:hover { filter: brightness(1.2); }
+  .results { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 16px; }
+  .stat { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 14px; }
+  .stat .val { font-size: 1.35rem; font-weight: 700; margin-top: 4px; }
+  .stat .lbl { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+  .good { color: var(--good); } .bad { color: var(--bad); } .warn { color: var(--warn); }
+  .verdict { padding: 14px 16px; border-radius: 12px; font-weight: 600; margin-bottom: 16px; }
+  canvas { width: 100%; height: 320px; }
+  .hint { font-size: 0.78rem; color: var(--muted); margin-top: 4px; }
+  select { width: 100%; padding: 8px 10px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); }
+</style>
+</head>
+<body>
+<h1>🏦 Retirement Planner</h1>
+<p class="subtitle">Inflation-adjusted projection including medical needs and recurring monthly commitments.</p>
+
+<div class="layout">
+  <div>
+    <div class="card">
+      <h2>About You</h2>
+      <div class="row">
+        <div><label>Current age</label><input type="number" id="age" value="35"></div>
+        <div><label>Retirement age</label><input type="number" id="retireAge" value="60"></div>
+      </div>
+      <div class="row">
+        <div><label>Life expectancy</label><input type="number" id="lifeExp" value="85"></div>
+        <div><label>Current annual income</label><input type="number" id="income" value="90000"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Savings &amp; Returns</h2>
+      <div class="row">
+        <div><label>Current retirement savings</label><input type="number" id="savings" value="100000"></div>
+        <div><label>Monthly contribution (pre-retirement)</label><input type="number" id="monthly" value="1500"></div>
+      </div>
+      <div class="row">
+        <div><label>Investment return % (pre-retirement)</label><input type="number" id="retWork" value="7" step="0.1"></div>
+        <div><label>Return % during retirement (conservative)</label><input type="number" id="retRet" value="4" step="0.1"></div>
+      </div>
+      <div class="row">
+        <div><label>Expected inflation %</label><input type="number" id="inflation" value="3" step="0.1"></div>
+        <div>
+          <label>Medical cost inflation %</label>
+          <input type="number" id="medInflation" value="6" step="0.1">
+          <div class="hint">Medical costs usually rise faster than general inflation</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Monthly Needs at Retirement (today's dollars)</h2>
+      <div class="row3">
+        <div><label>Living expenses</label><input type="number" id="living" value="2500"></div>
+        <div><label>Medical / healthcare</label><input type="number" id="medical" value="600"></div>
+        <div><label>Insurance premiums</label><input type="number" id="insurance" value="200"></div>
+      </div>
+      <table id="commitTable">
+        <thead><tr><th>Other monthly commitment</th><th>Amount</th><th>Ends (yrs into retirement)</th><th></th></tr></thead>
+        <tbody>
+          <tr><td><input type="text" value="Home loan" style="width:100%"></td><td><input type="number" value="800" class="amt"></td><td><input type="number" value="10" class="yrs"></td><td><button class="del-btn" onclick="delRow(this)">✕</button></td></tr>
+          <tr><td><input type="text" value="Support for parents" style="width:100%"></td><td><input type="number" value="400" class="amt"></td><td><input type="number" value="25" class="yrs"></td><td><button class="del-btn" onclick="delRow(this)">✕</button></td></tr>
+        </tbody>
+      </table>
+      <button class="add-btn" onclick="addRow()">+ Add commitment (loan, education, dependents…)</button>
+      <label style="margin-top:14px">Lump sum needed at retirement start (today's dollars)</label>
+      <input type="number" id="lumpSum" value="0" placeholder="e.g. final mortgage payoff, big trip">
+    </div>
+  </div>
+
+  <div>
+    <div id="verdict" class="verdict"></div>
+    <div class="results" id="stats"></div>
+    <div class="card"><h2>Savings Trajectory</h2><canvas id="chart"></canvas></div>
+    <div class="card">
+      <h2>Year-by-Year During Retirement</h2>
+      <div style="max-height:340px; overflow:auto;">
+        <table id="retTable"></table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const fmt = n => n.toLocaleString(undefined, {maximumFractionDigits: 0});
+const money = n => '$' + fmt(n);
+
+function addRow() {
+  const tb = document.querySelector('#commitTable tbody');
+  const tr = document.createElement('tr');
+  tr.innerHTML = `<td><input type="text" placeholder="e.g. child education" style="width:100%"></td>
+    <td><input type="number" value="0" class="amt"></td>
+    <td><input type="number" value="20" class="yrs"></td>
+    <td><button class="del-btn" onclick="delRow(this)">✕</button></td>`;
+  tb.appendChild(tr);
+  tr.querySelectorAll('input').forEach(i => i.addEventListener('input', calc));
+}
+function delRow(btn) { btn.closest('tr').remove(); calc(); }
+
+function num(id) { return parseFloat(document.getElementById(id).value) || 0; }
+
+function calc() {
+  const age = num('age'), retireAge = num('retireAge'), lifeExp = num('lifeExp');
+  const income = num('income'), savings = num('savings'), monthly = num('monthly');
+  const rWork = num('retWork') / 100 / 12, rRet = num('retRet') / 100 / 12;
+  const infl = num('inflation') / 100, medInfl = num('medInflation') / 100;
+  const living = num('living'), medical = num('medical'), insurance = num('insurance');
+  const lumpSum = num('lumpSum');
+  const yearsWork = Math.max(0, retireAge - age);
+  const yearsRet = Math.max(1, lifeExp - retireAge);
+
+  // collect commitments
+  const commits = [];
+  document.querySelectorAll('#commitTable tbody tr').forEach(tr => {
+    const amt = parseFloat(tr.querySelector('.amt').value) || 0;
+    const yrs = parseFloat(tr.querySelector('.yrs').value) || 0;
+    if (amt > 0) commits.push({ name: tr.querySelector('input').value || 'Commitment', amt, yrs });
+  });
+
+  // ---- accumulate savings until retirement ----
+  let balance = savings;
+  const trajectory = [{age, balance}];
+  for (let y = 0; y < yearsWork; y++) {
+    for (let m = 0; m < 12; m++) {
+      balance = balance * (1 + rWork) + monthly;
+    }
+    trajectory.push({age: age + y + 1, balance});
+  }
+  const nestEgg = balance;
+
+  // ---- required monthly income at retirement start (today's dollars) ----
+  const baseMonthly = living + medical + insurance + commits.reduce((s,c) => s + c.amt, 0);
+  const incomeReplacement = income * 0.7 / 12; // common 70% rule
+  const targetMonthlyToday = Math.max(baseMonthly, incomeReplacement);
+  const usingBase = baseMonthly >= incomeReplacement;
+
+  // ---- simulate retirement year by year ----
+  let bal = nestEgg - lumpSum * Math.pow(1 + infl, yearsWork);
+  let totalShortfall = 0, firstShortfallAge = null;
+  const retRows = [];
+  for (let y = 0; y < yearsRet; y++) {
+    const currentAge = retireAge + y;
+    // inflate needs
+    const livingN = living * Math.pow(1 + infl, y);
+    const medN = medical * Math.pow(1 + medInfl, y);
+    const insN = insurance * Math.pow(1 + infl, y);
+    let commitN = 0;
+    commits.forEach(c => { if (y < c.yrs) commitN += c.amt * Math.pow(1 + infl, y); });
+    const needMonthly = livingN + medN + insN + commitN;
+    const needAnnual = needMonthly * 12;
+    // draw at start of year, then grow remainder
+    bal -= needAnnual;
+    bal = bal * (1 + rRet);
+    if (bal < 0) {
+      totalShortfall += -bal;
+      if (firstShortfallAge === null) firstShortfallAge = currentAge;
+      bal = 0;
+    }
+    retRows.push({y, currentAge, livingN, medN, insN, commitN, needMonthly, needAnnual, bal});
+  }
+
+  // ---- verdict ----
+  const verdictEl = document.getElementById('verdict');
+  if (totalShortfall > 0) {
+    verdictEl.className = 'verdict bad';
+    verdictEl.style.background = 'rgba(248,113,113,.12)';
+    verdictEl.innerHTML = `⚠️ Shortfall: savings run out at age <b>${firstShortfallAge}</b>. Total gap ≈ <b>${money(totalShortfall)}</b> over retirement. Try increasing contributions, retiring later, or trimming commitments.`;
+  } else {
+    verdictEl.className = 'verdict good';
+    verdictEl.style.background = 'rgba(74,222,128,.12)';
+    verdictEl.innerHTML = `✅ On track — projected savings last through age ${lifeExp}, with ≈ <b>${money(bal)}</b> remaining.`;
+  }
+
+  // ---- stats ----
+  const gapToday = nestEgg / Math.pow(1 + infl, yearsWork); // nest egg in today's money
+  const stats = [
+    {lbl: 'Projected nest egg at retirement', val: money(nestEgg), cls: ''},
+    {lbl: `Needed monthly at retirement (nominal)`, val: money(retRows[0].needMonthly), cls: ''},
+    {lbl: 'In today\'s dollars', val: money(targetMonthlyToday), cls: ''},
+    {lbl: 'Years of retirement funded', val: (firstShortfallAge !== null ? (firstShortfallAge - retireAge) : yearsRet) + ' yrs', cls: firstShortfallAge !== null ? 'bad' : 'good'},
+    {lbl: 'Total shortfall', val: totalShortfall > 0 ? money(totalShortfall) : '$0', cls: totalShortfall > 0 ? 'bad' : 'good'},
+    {lbl: 'Extra monthly savings needed*', val: '', cls: 'warn', id: 'extra'},
+  ];
+  document.getElementById('stats').innerHTML = stats.map(s =>
+    `<div class="stat"><div class="lbl">${s.lbl}</div><div class="val ${s.cls}" ${s.id ? `id="${s.id}"` : ''}>${s.val}</div></div>`).join('');
+
+  // estimate extra monthly contribution needed to close gap (simple iterate)
+  let extra = 0;
+  if (totalShortfall > 0) {
+    const lumpAtRet = lumpSum * Math.pow(1 + infl, yearsWork);
+    // shortfall PV at retirement ~ sum of (bal deficits) — approximate by finding monthly x such that balance never negative
+    let lo = 0, hi = 100000;
+    for (let it = 0; it < 60; it++) {
+      const mid = (lo + hi) / 2;
+      let b = savings;
+      for (let y = 0; y < yearsWork; y++) for (let m = 0; m < 12; m++) b = b * (1 + rWork) + monthly + mid;
+      b -= lumpAtRet;
+      let ok = true;
+      for (let y = 0; y < yearsRet && ok; y++) {
+        const livingN = living * Math.pow(1 + infl, y);
+        const medN = medical * Math.pow(1 + medInfl, y);
+        const insN = insurance * Math.pow(1 + infl, y);
+        let commitN = 0;
+        commits.forEach(c => { if (y < c.yrs) commitN += c.amt * Math.pow(1 + infl, y); });
+        b -= (livingN + medN + insN + commitN) * 12;
+        b *= (1 + rRet);
+        if (b < 0) ok = false;
+      }
+      if (ok) hi = mid; else lo = mid;
+    }
+    extra = Math.ceil(hi);
+  }
+  document.getElementById('extra').textContent = money(extra);
+
+  // ---- retirement table ----
+  document.getElementById('retTable').innerHTML =
+    `<thead><tr><th>Age</th><th>Living</th><th>Medical</th><th>Insurance</th><th>Commitments</th><th>Total/mo</th><th>Balance after yr</th></tr></thead><tbody>` +
+    retRows.map(r => `<tr><td>${r.currentAge}</td><td>${money(r.livingN)}</td><td style="color:var(--warn)">${money(r.medN)}</td><td>${money(r.insN)}</td><td>${money(r.commitN)}</td><td><b>${money(r.needMonthly)}</b></td><td class="${r.bal <= 0 ? 'bad' : ''}">${money(r.bal)}</td></tr>`).join('') +
+    `</tbody>`;
+
+  drawChart(trajectory, retRows, retireAge);
+}
+
+function drawChart(trajectory, retRows, retireAge) {
+  const canvas = document.getElementById('chart');
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = canvas.offsetWidth * dpr;
+  canvas.height = 320 * dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  const W = canvas.offsetWidth, H = 320;
+  ctx.clearRect(0, 0, W, H);
+
+  const all = trajectory.map(t => t.balance).concat(retRows.map(r => r.bal));
+  const maxV = Math.max(...all, 1);
+  const pad = {l: 70, r: 15, t: 15, b: 28};
+  const n = trajectory.length + retRows.length;
+  const x = i => pad.l + (W - pad.l - pad.r) * i / (n - 1);
+  const y = v => H - pad.b - (H - pad.t - pad.b) * v / maxV;
+
+  // gridlines
+  ctx.strokeStyle = '#334155'; ctx.fillStyle = '#94a3b8'; ctx.font = '11px sans-serif';
+  for (let g = 0; g <= 4; g++) {
+    const v = maxV * g / 4, yy = y(v);
+    ctx.beginPath(); ctx.moveTo(pad.l, yy); ctx.lineTo(W - pad.r, yy); ctx.stroke();
+    ctx.fillText('$' + fmt(v), 5, yy + 4);
+  }
+
+  // retirement marker
+  ctx.strokeStyle = '#fbbf24'; ctx.setLineDash([4, 4]);
+  ctx.beginPath(); ctx.moveTo(x(trajectory.length - 1), pad.t); ctx.lineTo(x(trajectory.length - 1), H - pad.b); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillText('retire @ ' + retireAge, x(trajectory.length - 1) - 30, pad.t + 10);
+
+  // line
+  const pts = trajectory.map((t, i) => [x(i), y(t.balance)])
+    .concat(retRows.map((r, i) => [x(trajectory.length - 1 + i + 1), y(r.bal)]));
+  ctx.strokeStyle = '#38bdf8'; ctx.lineWidth = 2.5; ctx.beginPath();
+  pts.forEach((p, i) => i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]));
+  ctx.stroke();
+
+  // area under pre-retirement
+  ctx.globalAlpha = 0.15; ctx.fillStyle = '#38bdf8';
+  ctx.beginPath(); ctx.moveTo(pts[0][0], H - pad.b);
+  pts.slice(0, trajectory.length).forEach(p => ctx.lineTo(p[0], p[1]));
+  ctx.lineTo(pts[trajectory.length - 1][0], H - pad.b); ctx.fill();
+  ctx.globalAlpha = 1;
+
+  // x labels
+  ctx.fillStyle = '#94a3b8';
+  const firstAge = trajectory[0].age, lastAge = retireAge + retRows.length;
+  [firstAge, retireAge, lastAge].forEach((a, idx) => {
+    const i = idx === 0 ? 0 : idx === 1 ? trajectory.length - 1 : n - 1;
+    ctx.fillText('age ' + a, x(i) - 20, H - 8);
+  });
+}
+
+document.querySelectorAll('input').forEach(i => i.addEventListener('input', calc));
+calc();
+window.addEventListener('resize', calc);
+</script>
+</body>
+</html>
